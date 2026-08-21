@@ -46,10 +46,9 @@ public class SplitService : ISplitService
 
             // 2. Necesitamos el valor absoluto de la deuda para hacer matemática fácil
             decimal deudaAbsoluta = Math.Abs(deudor.Balance);
-
-            // 👉 TU RETO 1: Calcula el monto exacto a transferir.
-            // Usa Math.Min() para sacar el valor mínimo entre 'deudaAbsoluta' y 'acreedor.Balance'
-            decimal monto = // Escribe tu código aquí
+            
+            
+            decimal monto = Math.Min(deudaAbsoluta, acreedor.Balance);
 
                 // 3. Registramos la transferencia (¡Esto ya te lo regalo!)
                 transferencias.Add(new Transfer
@@ -59,23 +58,29 @@ public class SplitService : ISplitService
                     Amount = monto
                 });
 
-            // 👉 TU RETO 2: Actualizar los balances de ambas personas
-            // Al deudor.Balance tienes que SUMARLE el 'monto' (para que se acerque a 0).
-            // Al acreedor.Balance tienes que RESTARLE el 'monto' (para que baje hacia 0).
+
+            deudor.Balance += monto;
+            acreedor.Balance -= monto;
     
-            // 👉 TU RETO 3: Sacar a las personas de la fila si ya quedaron a mano
-            // Escribe un 'if' comprobando si deudor.Balance es igual a 0. Si es así, sácalo de la lista usando deudores.Remove(deudor);
+
+            if (deudor.Balance == 0)
+            {
+                deudores.Remove(deudor);
+            }
             // Haz otro 'if' igual para el acreedor y sácalo de la lista 'acreedores' si su balance llegó a 0.
+            if (acreedor.Balance == 0)
+            {
+                acreedores.Remove(acreedor);
+            }
         }
 
 // PASO FINAL: Armar el objeto de respuesta
         return new SplitResult
         {
             Total = total,
-            People = resumenes, // Usamos la lista de resúmenes que hicimos en el Paso 4
+            People = resumenes, 
             Transfers = transferencias
         };
-        return new SplitResult();
         
     }
 }
