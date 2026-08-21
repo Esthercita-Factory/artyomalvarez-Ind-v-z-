@@ -1,3 +1,5 @@
+
+
 namespace InDivizia.Domain.Entities;
 
 public class SplitResult
