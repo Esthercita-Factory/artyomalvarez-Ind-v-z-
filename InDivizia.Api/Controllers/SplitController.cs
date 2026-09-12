@@ -18,12 +18,21 @@ public class SplitController : ControllerBase
 
     // Método POST para recibir los gastos y calcular la división
     [HttpPost]
-    public ActionResult<SplitResult> Calculate([FromBody] List<Expense> expenses)
+    public ActionResult<SplitResult> Calculate([FromBody] List<Expense>? expenses)
     {
-        // 1. Enviamos el pedido al Chef (Servicio de Aplicación)
-        var result = _splitService.CalculateSplit(expenses);
+        if (expenses is null)
+        {
+            return BadRequest(new { error = "El cuerpo de la solicitud es obligatorio." });
+        }
 
-        // 2. Retornamos la respuesta 200 OK con el plato preparado (SplitResult)
-        return Ok(result);
+        try
+        {
+            var result = _splitService.CalculateSplit(expenses);
+            return Ok(result);
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { error = exception.Message });
+        }
     }
 }

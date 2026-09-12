@@ -7,80 +7,121 @@ public class SplitService : ISplitService
 {
     public SplitResult CalculateSplit(List<Expense> expenses)
     {
-        
-        // 1. Calcular el total de todos los gastos
-        decimal total = expenses.Sum(expense => expense.Amount);
-        // 2. Agrupar los gastos por PaidBy para saber cuánto pagó cada persona (PersonSummary)
-        var gastosAgrupados = expenses.GroupBy(expense => expense.PaidBy);
-        // 3. Calcular el FairShare (lo que le toca pagar a cada uno)
-        int cantidadPersonas = gastosAgrupados.Count();
-        decimal fairShare = total / cantidadPersonas;
-        // 4. Calcular los Balances (TotalPaid - FairShare)
-        List<PersonSummary> resumenes = gastosAgrupados.Select(grupo => new PersonSummary
+        ArgumentNullException.ThrowIfNull(expenses);
+
+        if (expenses.Count == 0)
         {
-            Name = grupo.Key,
-            TotalPaid = grupo.Sum(gasto =>gasto.Amount),
-            FairShare = fairShare, 
-            Balance = grupo.Sum(gasto =>gasto.Amount) - fairShare
-        }).ToList();
-        // 5. Algoritmo Greedy para calcular las Transferencias (quién le paga a quién)
+            throw new ArgumentException("Debe existir al menos un gasto.", nameof(expenses));
+        }
+
+        if (expenses.Any(expense => string.IsNullOrWhiteSpace(expense.PaidBy)))
+        {
+            throw new ArgumentException("Todos los gastos deben indicar quién pagó.", nameof(expenses));
+        }
+
+        if (expenses.Any(expense => expense.Amount < 0))
+        {
+            throw new ArgumentException("Los montos no pueden ser negativos.", nameof(expenses));
+        }
+
+        if (expenses.Any(expense => decimal.Round(expense.Amount, 2) != expense.Amount))
+        {
+            throw new ArgumentException("Los montos pueden tener como máximo dos decimales.", nameof(expenses));
+        }
+
+        decimal total = expenses.Sum(expense => expense.Amount);
+        var gastosAgrupados = expenses
+            .GroupBy(expense => expense.PaidBy.Trim(), StringComparer.OrdinalIgnoreCase)
+            .OrderBy(grupo => grupo.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        int cantidadPersonas = gastosAgrupados.Count;
+
+        // Cuando el total no se puede dividir en centavos iguales, el sobrante se
+        // distribuye de a un centavo para que las cuotas sumen exactamente el total.
+        decimal cuotaBase = Math.Floor(total / cantidadPersonas * 100) / 100;
+        int centavosRestantes = (int)decimal.Round(
+            (total - cuotaBase * cantidadPersonas) * 100,
+            0,
+            MidpointRounding.AwayFromZero);
+
+        List<PersonSummary> resumenes = gastosAgrupados
+            .Select((grupo, indice) =>
+            {
+                decimal fairShare = cuotaBase + (indice < centavosRestantes ? 0.01m : 0m);
+                decimal totalPaid = grupo.Sum(gasto => gasto.Amount);
+
+                return new PersonSummary
+                {
+                    Name = grupo.Key,
+                    TotalPaid = totalPaid,
+                    FairShare = fairShare,
+                    Balance = totalPaid - fairShare
+                };
+            })
+            .ToList();
+
+        // Se usan cuentas auxiliares para no modificar los balances que se devuelven.
         var deudores = resumenes
             .Where(persona => persona.Balance < 0)
             .OrderBy(persona => persona.Balance)
+            .Select(persona => new SettlementAccount(persona.Name, Math.Abs(persona.Balance)))
             .ToList();
-            
+
         var acreedores = resumenes
             .Where(persona => persona.Balance > 0)
             .OrderByDescending(persona => persona.Balance)
+            .Select(persona => new SettlementAccount(persona.Name, persona.Balance))
             .ToList();
-        
-        // PASO 5.4: El ciclo de transferencias
-        List<Transfer> transferencias = new List<Transfer>();
 
-// Mientras haya deudores Y acreedores en las filas...
-        while (deudores.Any() && acreedores.Any()) //[cite: 9]
+        List<Transfer> transferencias = new();
+        int indiceDeudor = 0;
+        int indiceAcreedor = 0;
+
+        while (indiceDeudor < deudores.Count && indiceAcreedor < acreedores.Count)
         {
-            // 1. Tomamos a los primeros de cada fila
-            var deudor = deudores.First(); //[cite: 9]
-            var acreedor = acreedores.First(); //[cite: 9]
+            var deudor = deudores[indiceDeudor];
+            var acreedor = acreedores[indiceAcreedor];
+            decimal monto = Math.Min(deudor.Remaining, acreedor.Remaining);
 
-            // 2. Necesitamos el valor absoluto de la deuda para hacer matemática fácil
-            decimal deudaAbsoluta = Math.Abs(deudor.Balance);
-            
-            
-            decimal monto = Math.Min(deudaAbsoluta, acreedor.Balance);
-
-                // 3. Registramos la transferencia (¡Esto ya te lo regalo!)
-                transferencias.Add(new Transfer
-                {
-                    From = deudor.Name,
-                    To = acreedor.Name,
-                    Amount = monto
-                });
-
-
-            deudor.Balance += monto;
-            acreedor.Balance -= monto;
-    
-
-            if (deudor.Balance == 0)
+            transferencias.Add(new Transfer
             {
-                deudores.Remove(deudor);
+                From = deudor.Name,
+                To = acreedor.Name,
+                Amount = monto
+            });
+
+            deudor.Remaining -= monto;
+            acreedor.Remaining -= monto;
+
+            if (deudor.Remaining == 0)
+            {
+                indiceDeudor++;
             }
-            // Haz otro 'if' igual para el acreedor y sácalo de la lista 'acreedores' si su balance llegó a 0.
-            if (acreedor.Balance == 0)
+
+            if (acreedor.Remaining == 0)
             {
-                acreedores.Remove(acreedor);
+                indiceAcreedor++;
             }
         }
 
-// PASO FINAL: Armar el objeto de respuesta
         return new SplitResult
         {
             Total = total,
-            People = resumenes, 
+            People = resumenes,
             Transfers = transferencias
         };
-        
+    }
+
+    private sealed class SettlementAccount
+    {
+        public SettlementAccount(string name, decimal remaining)
+        {
+            Name = name;
+            Remaining = remaining;
+        }
+
+        public string Name { get; }
+        public decimal Remaining { get; set; }
     }
 }
