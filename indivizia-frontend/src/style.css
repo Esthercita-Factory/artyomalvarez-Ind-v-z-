@@ -557,11 +557,54 @@ fieldset {
   background: #1c2747;
 }
 
-.batch-card textarea {
+.batch-card textarea,
+.batch-card input[type="number"] {
   color: white;
   border-color: #43506d;
   background: #0a1020;
+}
+
+.batch-card textarea {
   resize: vertical;
+}
+
+.batch-divider {
+  position: relative;
+  margin: 14px 0 10px;
+  border-top: 1px solid #2d3853;
+  text-align: center;
+}
+
+.batch-divider span {
+  position: relative;
+  top: -8px;
+  padding: 0 8px;
+  color: #8fa0c0;
+  background: #10192e;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.batch-by-count label {
+  color: #b8c0d4;
+  font-size: 11px;
+}
+
+.count-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.count-input-row input {
+  margin-top: 0;
+  flex: 1;
+}
+
+.count-input-row .dark-button {
+  flex: 0 0 auto;
 }
 
 .button-row {

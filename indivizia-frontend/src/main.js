@@ -355,6 +355,42 @@ $("#btnPegarNombres").addEventListener("click", async () => {
   }
 });
 
+$("#btnAgregarCantidad").addEventListener("click", () => {
+  const input = $("#inputCantidadNoCompraron");
+  const cantidad = parseInt(input.value, 10);
+
+  if (isNaN(cantidad) || cantidad <= 0) {
+    showToast("Ingresa un número válido de personas.");
+    return;
+  }
+
+  const regex = /^invitado\s+(\d+)$/i;
+  let maxIndex = 0;
+  expenses.forEach((e) => {
+    const match = e.paidBy.trim().match(regex);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxIndex) maxIndex = num;
+    }
+  });
+
+  for (let i = 1; i <= cantidad; i++) {
+    expenses.push({
+      paidBy: `Invitado ${maxIndex + i}`,
+      description: "No compró",
+      category: "Otros",
+      amount: 0,
+    });
+  }
+
+  input.value = "";
+  saveState();
+  renderExpenses();
+  showToast(
+    `${cantidad} ${cantidad === 1 ? "invitado agregado" : "invitados agregados"} en $0.`,
+  );
+});
+
 $("#btnCalcular").addEventListener("click", async () => {
   if (expenses.length === 0) {
     showToast("Agrega al menos un gasto primero.");

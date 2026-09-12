@@ -140,6 +140,26 @@
           </button>
           <button id="btnLimpiarNombres" class="dark-button" type="button">Limpiar</button>
         </div>
+
+        <div class="batch-divider"><span>o simplemente por cantidad</span></div>
+
+        <div class="batch-by-count">
+          <label for="inputCantidadNoCompraron">¿Cuántos solo consumen y no pagaron nada?</label>
+          <div class="count-input-row">
+            <input
+              type="number"
+              id="inputCantidadNoCompraron"
+              min="1"
+              max="500"
+              placeholder="Ej: 24"
+            />
+            <button id="btnAgregarCantidad" class="dark-button" type="button">
+              <span class="material-symbols-outlined">group_add</span>
+              Agregar cantidad
+            </button>
+          </div>
+        </div>
+
         <p id="resumenNoCompraron" class="batch-summary">Ninguna persona agregada en $0.</p>
       </section>
 
