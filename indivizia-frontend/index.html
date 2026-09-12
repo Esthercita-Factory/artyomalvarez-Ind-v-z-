@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Divide gastos grupales y simplifica las transferencias." />
+    <title>InDivízia</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=Material+Symbols+Outlined&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon material-symbols-outlined">payments</span>
+        <div>
+          <h1>InDivízia</h1>
+          <span id="modeLabel">Modo Vaca Masiva</span>
+        </div>
+      </div>
+      <button id="btnNuevoEvento" class="icon-button" type="button" aria-label="Administrar eventos">
+        <span class="material-symbols-outlined">event</span>
+      </button>
+    </header>
+
+    <main class="app-shell">
+      <section class="mode-switch" aria-label="Modo de división">
+        <button id="btnModoSimple" type="button">Modo simple</button>
+        <button id="btnModoMasivo" type="button" class="active">
+          Vaca masiva <span class="status-dot"></span>
+        </button>
+        <p id="modeDescription">La vaca masiva para grupos donde muchos consumen y pocos pagan.</p>
+      </section>
+
+      <section id="eventSummary" class="card event-summary">
+        <div class="section-row">
+          <span id="badgePersonas" class="badge">👥 0 personas involucradas</span>
+          <button id="btnCambiarEvento" class="secondary-button compact" type="button">
+            <span class="material-symbols-outlined">unfold_more</span>
+            Cambiar
+          </button>
+        </div>
+        <div class="event-heading">
+          <div>
+            <h2 id="nombreEvento">Mi primera vaca</h2>
+            <span>Evento actual</span>
+          </div>
+          <div class="numeric-summary">
+            <span>Fondo actual</span>
+            <strong id="pozoActual">$ 0</strong>
+          </div>
+        </div>
+        <div class="event-ratio">
+          <span><i class="dot paid"></i><strong id="cantidadCompradores">0</strong> pagaron gastos</span>
+          <span><i class="dot consumers"></i><strong id="cantidadNoCompraron">0</strong> solo consumen</span>
+        </div>
+      </section>
+
+      <section id="gastos" class="card">
+        <div class="section-title">
+          <span class="step">1</span>
+          <div>
+            <h2>Agregar gasto</h2>
+            <p>Registra a cada persona que pagó una compra.</p>
+          </div>
+        </div>
+
+        <form id="expenseForm" class="form-grid">
+          <label class="full">
+            ¿Quién pagó?
+            <input id="inputPaidBy" type="text" autocomplete="off" placeholder="Ej: Lucas" required />
+          </label>
+          <label class="full">
+            Descripción
+            <input id="inputDescription" type="text" autocomplete="off" placeholder="Ej: Carne para el asado" />
+          </label>
+          <fieldset id="categoryPills" class="full category-field">
+            <legend>Categoría</legend>
+            <div class="pills">
+              <button class="pill" data-value="Herramientas" type="button">🔧 Herramientas</button>
+              <button class="pill" data-value="Insumos" type="button">📇 Insumos</button>
+              <button class="pill" data-value="Pasajes" type="button">🚗 Pasajes</button>
+              <button class="pill" data-value="Otros" type="button">📦 Otros</button>
+            </div>
+          </fieldset>
+          <label class="full">
+            Monto
+            <input id="inputAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00" required />
+          </label>
+          <label class="full">
+            Llave o cuenta de quien pagó (opcional)
+            <input id="inputAlias" type="text" autocomplete="off" placeholder="Ej: @lucas o celular" />
+          </label>
+          <div class="form-actions full">
+            <button id="btnAgregarGasto" class="primary-button" type="submit">
+              <span class="material-symbols-outlined">add</span>
+              <span id="btnAgregarGastoTexto">Agregar gasto</span>
+            </button>
+            <button id="btnCancelarEdicion" class="secondary-button" type="button" hidden>
+              Cancelar edición
+            </button>
+          </div>
+        </form>
+
+        <div class="list-header">
+          <span>Gastos cargados (<strong id="countGastos">0</strong>)</span>
+          <strong id="subtotalValue">$ 0</strong>
+        </div>
+        <div id="expensesList" class="scroll-list empty-list">
+          <p>Todavía no has agregado gastos.</p>
+        </div>
+      </section>
+
+      <section id="batchSection" class="batch-card">
+        <div class="section-title dark">
+          <span class="material-symbols-outlined batch-icon">group_add</span>
+          <div>
+            <h2>Agregar los que no compraron</h2>
+            <p>Pega todos los nombres separados por comas.</p>
+          </div>
+        </div>
+        <label class="sr-only" for="inputNoCompraron">Nombres separados por comas</label>
+        <textarea
+          id="inputNoCompraron"
+          rows="3"
+          placeholder="Leonardo, Ash, Felipe, Martina..."
+        ></textarea>
+        <div class="button-row">
+          <button id="btnPegarNombres" class="dark-button" type="button">
+            <span class="material-symbols-outlined">content_paste</span>
+            Pegar
+          </button>
+          <button id="btnAgregarNoCompraron" class="dark-button grow" type="button">
+            <span class="material-symbols-outlined">done_all</span>
+            Agregar lote
+          </button>
+          <button id="btnLimpiarNombres" class="dark-button" type="button">Limpiar</button>
+        </div>
+        <p id="resumenNoCompraron" class="batch-summary">Ninguna persona agregada en $0.</p>
+      </section>
+
+      <button id="btnCalcular" class="primary-button calculate-button" type="button">
+        <span class="material-symbols-outlined">calculate</span>
+        <span id="btnCalcularTexto">Calcular la vaca</span>
+      </button>
+
+      <section id="resultados" class="card results" hidden>
+        <div class="section-row">
+          <div>
+            <h2>Liquidación simplificada</h2>
+            <p>Balances y transferencias sugeridas.</p>
+          </div>
+          <span id="cantidadPagos" class="badge">0 pagos</span>
+        </div>
+
+        <div class="metrics">
+          <div><span>Total</span><strong id="totalGastado">$ 0</strong></div>
+          <div><span>Integrantes</span><strong id="cantidadPersonas">0</strong></div>
+          <div><span>Cuota</span><strong id="cuotaJusta">$ 0</strong></div>
+        </div>
+
+        <section id="balances">
+          <h3>Balances</h3>
+          <div id="balancesList" class="scroll-list results-list"></div>
+        </section>
+
+        <section id="liquidacion">
+          <h3>Transferencias</h3>
+          <div id="transfersList" class="scroll-list results-list"></div>
+        </section>
+
+        <p id="checkFinal" class="success-message"></p>
+        <button id="btnWhatsapp" class="whatsapp-button" type="button">
+          <span class="material-symbols-outlined">share</span>
+          Compartir por WhatsApp
+        </button>
+        <button id="btnReiniciar" class="text-button danger" type="button">
+          Borrar gastos del evento actual
+        </button>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Navegación principal">
+      <button class="navtab active" data-target="gastos" type="button">
+        <span class="material-symbols-outlined">receipt_long</span>Gastos
+      </button>
+      <button class="navtab" data-target="balances" type="button">
+        <span class="material-symbols-outlined">account_balance_wallet</span>Balances
+      </button>
+      <button class="navtab" data-target="liquidacion" type="button">
+        <span class="material-symbols-outlined">handshake</span>Liquidación
+      </button>
+    </nav>
+
+    <dialog id="eventDialog" class="event-dialog">
+      <form method="dialog" class="dialog-panel">
+        <header class="dialog-header">
+          <div class="section-title">
+            <span class="material-symbols-outlined event-icon">local_fire_department</span>
+            <div>
+              <h2>Seleccionar o crear evento</h2>
+              <p>Los eventos se guardan solamente en este dispositivo.</p>
+            </div>
+          </div>
+          <button id="btnCerrarEventos" class="icon-button" value="cancel" aria-label="Cerrar modal">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </header>
+
+        <div class="dialog-body">
+          <section>
+            <div class="list-header">
+              <span>Eventos guardados</span>
+              <span id="cantidadEventos">0 eventos</span>
+            </div>
+            <div id="eventosList" class="event-list"></div>
+          </section>
+
+          <div class="separator"><span>o crea uno nuevo</span></div>
+
+          <section class="new-event">
+            <h3><span class="material-symbols-outlined">add_circle</span> Nuevo evento</h3>
+            <label>
+              Nombre
+              <input id="eventName" type="text" placeholder="Ej: Asado fin de año" />
+            </label>
+            <fieldset>
+              <legend>Tipo</legend>
+              <div id="eventTypePills" class="pills">
+                <button class="event-type active" data-type="Asado" type="button">🔥 Asado</button>
+                <button class="event-type" data-type="Fiesta" type="button">🎉 Fiesta</button>
+                <button class="event-type" data-type="Viaje" type="button">✈️ Viaje</button>
+                <button class="event-type" data-type="Juntada" type="button">👥 Juntada</button>
+              </div>
+            </fieldset>
+            <label>
+              Personas estimadas
+              <input id="eventPeople" type="number" min="2" max="500" value="10" />
+            </label>
+          </section>
+        </div>
+
+        <footer class="dialog-footer">
+          <button id="btnConfirmarEvento" class="primary-button" value="default" type="button">
+            Confirmar / abrir evento
+          </button>
+          <button class="text-button" value="cancel">Cancelar</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
