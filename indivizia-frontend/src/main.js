@@ -21,6 +21,8 @@ let categoriaSeleccionada = "Insumos";
 let tipoEventoSeleccionado = "Asado";
 let resultadoActual = null;
 let editingExpenseIndex = null;
+let nameFilter = "";
+let filterPanelOpen = false;
 let currentMode = localStorage.getItem(MODE_KEY) === "simple" ? "simple" : "massive";
 let events = loadEvents();
 let activeEventId = localStorage.getItem(ACTIVE_EVENT_KEY) ?? events[0].id;
@@ -40,13 +42,25 @@ function createElement(tag, className, text) {
   return element;
 }
 
+const AUTO_GUEST_REGEX = /^invitado\s+(\d+)$/i;
+
+function normalizeAutoGuestLabel(name) {
+  const match = name.trim().match(AUTO_GUEST_REGEX);
+  return match ? `Invitado ${Number(match[1])}` : "";
+}
+
+function hydrateExpense(expense) {
+  const autoGuest = expense.autoGuest || normalizeAutoGuestLabel(expense.paidBy ?? "");
+  return autoGuest ? { ...expense, autoGuest } : { ...expense };
+}
+
 function loadEvents() {
   try {
     const savedEvents = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
     if (Array.isArray(savedEvents) && savedEvents.length > 0) {
       return savedEvents.map((event) => ({
         ...event,
-        expenses: Array.isArray(event.expenses) ? event.expenses : [],
+        expenses: Array.isArray(event.expenses) ? event.expenses.map(hydrateExpense) : [],
         aliases: event.aliases && typeof event.aliases === "object" ? event.aliases : {},
       }));
     }
@@ -119,6 +133,33 @@ function initials(name) {
     .slice(0, 2);
 }
 
+function getAutoGuestLabel(name) {
+  const key = canonicalName(name);
+  const expense = expenses.find((item) => canonicalName(item.paidBy) === key);
+  return expense?.autoGuest || normalizeAutoGuestLabel(name);
+}
+
+function displayPersonName(name) {
+  const autoGuest = getAutoGuestLabel(name);
+  if (autoGuest && canonicalName(autoGuest) !== canonicalName(name)) {
+    return `${name} (${autoGuest})`;
+  }
+  return name;
+}
+
+function autoGuestHue(label) {
+  const number = Number(label.match(/\d+/)?.[0] || 0);
+  return (number * 47) % 360;
+}
+
+function isAutoGuestExpense(expense) {
+  return Boolean(expense.autoGuest || normalizeAutoGuestLabel(expense.paidBy));
+}
+
+function appendGroupTitle(container, title) {
+  container.append(createElement("p", "expense-group-title", title));
+}
+
 function getPeopleSummary() {
   const totals = new Map();
   expenses.forEach((expense) => {
@@ -128,6 +169,69 @@ function getPeopleSummary() {
     totals.set(key, current);
   });
   return [...totals.values()];
+}
+
+function isNameFilterActive() {
+  return Boolean(canonicalName(nameFilter));
+}
+
+function getVisibleExpenses() {
+  const query = canonicalName(nameFilter);
+  return expenses
+    .map((expense, index) => ({ expense, index }))
+    .filter(({ expense }) => !query || canonicalName(expense.paidBy).includes(query));
+}
+
+function uniquePeopleNames() {
+  const seen = new Set();
+  const names = [];
+
+  expenses.forEach((expense) => {
+    const key = canonicalName(expense.paidBy);
+    if (!seen.has(key)) {
+      seen.add(key);
+      names.push(expense.paidBy);
+    }
+  });
+
+  return names.sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+}
+
+function resetNameFilter() {
+  nameFilter = "";
+  filterPanelOpen = false;
+  const input = $("#inputFiltroNombre");
+  if (input) input.value = "";
+}
+
+function renderNameFilter() {
+  const filterButton = $("#btnFiltrarNombres");
+  const panel = $("#filtroNombresPanel");
+  const clearFilterButton = $("#btnQuitarFiltro");
+  const chips = $("#nameFilterChips");
+  const filtering = isNameFilterActive();
+  const names = uniquePeopleNames();
+
+  if (filterButton) {
+    filterButton.hidden = expenses.length === 0;
+    filterButton.classList.toggle("active", filterPanelOpen || filtering);
+  }
+
+  if (panel) panel.hidden = expenses.length === 0 || (!filterPanelOpen && !filtering);
+  if (clearFilterButton) clearFilterButton.hidden = !filtering;
+
+  if (!chips) return;
+
+  chips.replaceChildren();
+  chips.hidden = names.length === 0 || panel?.hidden;
+
+  names.forEach((name) => {
+    const chip = createElement("button", "name-chip", name);
+    chip.type = "button";
+    chip.dataset.name = name;
+    chip.classList.toggle("active", canonicalName(name) === canonicalName(nameFilter));
+    chips.append(chip);
+  });
 }
 
 function renderSummary() {
@@ -150,10 +254,71 @@ function renderSummary() {
       : `${consumers} ${consumers === 1 ? "persona agregada" : "personas agregadas"} en $0.`;
 }
 
+function createExpenseRow(expense, index) {
+  const autoGuest = expense.autoGuest || normalizeAutoGuestLabel(expense.paidBy);
+  const row = createElement("article", `expense-item${autoGuest ? " auto-guest-expense" : ""}`);
+  const info = createElement("div", "expense-info");
+  const icon = createElement("div", "expense-icon", iconosCategoria[expense.category] ?? "📦");
+  const details = createElement("div");
+  const name = createElement("span", "expense-name", expense.paidBy);
+  if (autoGuest) {
+    name.append(
+      createElement(
+        "span",
+        "guest-badge",
+        canonicalName(autoGuest) === canonicalName(expense.paidBy) ? "Automático" : autoGuest,
+      ),
+    );
+  }
+  const category = createElement("span", "expense-tag", expense.category);
+  const description = createElement("div", "expense-desc", expense.description);
+  const right = createElement("div", "expense-right");
+  const amount = createElement("span", "expense-amount", formatMoney(expense.amount));
+  const editButton = createElement("button", "delete-btn edit-expense-btn");
+  const deleteButton = createElement("button", "delete-btn");
+
+  editButton.type = "button";
+  editButton.dataset.index = String(index);
+  editButton.setAttribute("aria-label", `Editar gasto de ${expense.paidBy}`);
+  editButton.append(createElement("span", "material-symbols-outlined", "edit"));
+  deleteButton.type = "button";
+  deleteButton.dataset.index = String(index);
+  deleteButton.setAttribute("aria-label", `Eliminar gasto de ${expense.paidBy}`);
+  deleteButton.append(createElement("span", "material-symbols-outlined", "delete"));
+
+  name.append(category);
+  details.append(name, description);
+
+  if (autoGuest) {
+    const rename = createElement("div", "guest-rename");
+    const input = createElement("input", "guest-name-input");
+    const saveButton = createElement("button", "save-guest-name-btn", "Poner nombre");
+    const unnamed = canonicalName(expense.paidBy) === canonicalName(autoGuest);
+    input.type = "text";
+    input.value = unnamed ? "" : expense.paidBy;
+    input.placeholder = `Nombre de ${autoGuest}`;
+    input.setAttribute("aria-label", `Nombre de ${autoGuest}`);
+    input.dataset.person = expense.paidBy;
+    saveButton.type = "button";
+    saveButton.dataset.person = expense.paidBy;
+    rename.append(input, saveButton);
+    details.append(rename);
+  }
+
+  info.append(icon, details);
+  right.append(amount, editButton, deleteButton);
+  row.append(info, right);
+  return row;
+}
+
 function renderExpenses() {
   const container = $("#expensesList");
+  const visibleExpenses = getVisibleExpenses();
   container.replaceChildren();
-  container.classList.toggle("empty-list", expenses.length === 0);
+  container.classList.toggle("empty-list", visibleExpenses.length === 0);
+  const clearBtn = $("#btnLimpiarGastos");
+  if (clearBtn) clearBtn.hidden = expenses.length === 0;
+  renderNameFilter();
 
   if (expenses.length === 0) {
     container.append(createElement("p", "", "Todavía no has agregado gastos."));
@@ -161,37 +326,36 @@ function renderExpenses() {
     return;
   }
 
-  expenses.forEach((expense, index) => {
-    const row = createElement("article", "expense-item");
-    const info = createElement("div", "expense-info");
-    const icon = createElement("div", "expense-icon", iconosCategoria[expense.category] ?? "📦");
-    const details = createElement("div");
-    const name = createElement("span", "expense-name", expense.paidBy);
-    const category = createElement("span", "expense-tag", expense.category);
-    const description = createElement("div", "expense-desc", expense.description);
-    const right = createElement("div", "expense-right");
-    const amount = createElement("span", "expense-amount", formatMoney(expense.amount));
-    const editButton = createElement("button", "delete-btn edit-expense-btn");
-    const deleteButton = createElement("button", "delete-btn");
+  if (visibleExpenses.length === 0) {
+    container.append(
+      createElement(
+        "p",
+        "",
+        `Ningún gasto coincide con “${nameFilter.trim()}”. Los datos siguen guardados.`,
+      ),
+    );
+    renderSummary();
+    $("#countGastos").textContent = `0/${expenses.length}`;
+    return;
+  }
 
-    editButton.type = "button";
-    editButton.dataset.index = String(index);
-    editButton.setAttribute("aria-label", `Editar gasto de ${expense.paidBy}`);
-    editButton.append(createElement("span", "material-symbols-outlined", "edit"));
-    deleteButton.type = "button";
-    deleteButton.dataset.index = String(index);
-    deleteButton.setAttribute("aria-label", `Eliminar gasto de ${expense.paidBy}`);
-    deleteButton.append(createElement("span", "material-symbols-outlined", "delete"));
+  const loadedExpenses = visibleExpenses.filter(({ expense }) => !isAutoGuestExpense(expense));
+  const guestExpenses = visibleExpenses.filter(({ expense }) => isAutoGuestExpense(expense));
+  const splitGroups = loadedExpenses.length > 0 && guestExpenses.length > 0;
 
-    name.append(category);
-    details.append(name, description);
-    info.append(icon, details);
-    right.append(amount, editButton, deleteButton);
-    row.append(info, right);
-    container.append(row);
-  });
+  if (splitGroups) {
+    appendGroupTitle(container, "Gastos que ya estaban");
+    loadedExpenses.forEach(({ expense, index }) => container.append(createExpenseRow(expense, index)));
+    appendGroupTitle(container, "Invitados automáticos");
+    guestExpenses.forEach(({ expense, index }) => container.append(createExpenseRow(expense, index)));
+  } else {
+    visibleExpenses.forEach(({ expense, index }) => container.append(createExpenseRow(expense, index)));
+  }
 
   renderSummary();
+  if (isNameFilterActive()) {
+    $("#countGastos").textContent = `${visibleExpenses.length}/${expenses.length}`;
+  }
 }
 
 $("#categoryPills").addEventListener("click", (event) => {
@@ -239,7 +403,9 @@ $("#expenseForm").addEventListener("submit", (event) => {
   if (editingExpenseIndex === null) {
     expenses.push(expense);
   } else {
-    expenses[editingExpenseIndex] = expense;
+    const previous = expenses[editingExpenseIndex];
+    const autoGuest = previous.autoGuest || normalizeAutoGuestLabel(previous.paidBy);
+    expenses[editingExpenseIndex] = autoGuest ? { ...expense, autoGuest } : expense;
   }
 
   if (alias) {
@@ -255,6 +421,14 @@ $("#expenseForm").addEventListener("submit", (event) => {
 });
 
 $("#expensesList").addEventListener("click", (event) => {
+  const guestButton = event.target.closest(".save-guest-name-btn");
+  if (guestButton) {
+    const row = guestButton.closest(".expense-item");
+    const input = row?.querySelector(".guest-name-input");
+    renameAutoGuest(guestButton.dataset.person, input?.value ?? "");
+    return;
+  }
+
   const editButton = event.target.closest(".edit-expense-btn");
   if (editButton) {
     startExpenseEditing(Number(editButton.dataset.index));
@@ -271,6 +445,15 @@ $("#expensesList").addEventListener("click", (event) => {
   $("#resultados").hidden = true;
   saveState();
   renderExpenses();
+});
+
+$("#expensesList").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  const input = event.target.closest(".guest-name-input");
+  if (!input) return;
+
+  event.preventDefault();
+  renameAutoGuest(input.dataset.person, input.value);
 });
 
 function startExpenseEditing(index) {
@@ -375,11 +558,13 @@ $("#btnAgregarCantidad").addEventListener("click", () => {
   });
 
   for (let i = 1; i <= cantidad; i++) {
+    const autoGuest = `Invitado ${maxIndex + i}`;
     expenses.push({
-      paidBy: `Invitado ${maxIndex + i}`,
+      paidBy: autoGuest,
       description: "No compró",
       category: "Otros",
       amount: 0,
+      autoGuest,
     });
   }
 
@@ -400,6 +585,7 @@ $("#btnCalcular").addEventListener("click", async () => {
   const button = $("#btnCalcular");
   button.disabled = true;
   $("#btnCalcularTexto").textContent = "Calculando...";
+  clearQuotas({ confirm: false, silent: true });
 
   try {
     const response = await fetch(API_URL, {
@@ -433,7 +619,57 @@ $("#btnCalcular").addEventListener("click", async () => {
   }
 });
 
-function showResults(result) {
+function createBalanceRow(person) {
+  const autoGuest = getAutoGuestLabel(person.name);
+  const row = createElement("article", `balance-item${autoGuest ? " auto-guest-row" : ""}`);
+  const left = createElement("div", "balance-left");
+  const avatar = createElement("div", `avatar${autoGuest ? " auto-guest" : ""}`, initials(person.name));
+  const details = createElement("div");
+  const name = createElement("div", "balance-name", person.name);
+  if (autoGuest) {
+    avatar.style.background = `hsl(${autoGuestHue(autoGuest)} 52% 42%)`;
+    name.append(createElement("span", "guest-badge", autoGuest));
+  }
+  const paid = createElement(
+    "div",
+    "balance-paid",
+    `Pagó ${formatMoney(person.totalPaid)} · Cuota ${formatMoney(person.fairShare)}`,
+  );
+  const balance = Number(person.balance);
+  const chipClass =
+    balance > 0 ? "chip-positive" : balance < 0 ? "chip-negative" : "chip-neutral";
+  const chipText =
+    balance > 0
+      ? `Le deben ${formatMoney(balance)}`
+      : balance < 0
+        ? `Debe ${formatMoney(Math.abs(balance))}`
+        : "Está saldado";
+  const chip = createElement("span", `balance-chip ${chipClass}`, chipText);
+
+  details.append(name, paid);
+
+  if (autoGuest) {
+    const rename = createElement("div", "guest-rename");
+    const input = createElement("input", "guest-name-input");
+    const saveButton = createElement("button", "save-guest-name-btn", "Poner nombre");
+    const unnamed = canonicalName(person.name) === canonicalName(autoGuest);
+    input.type = "text";
+    input.value = unnamed ? "" : person.name;
+    input.placeholder = `Nombre de ${autoGuest}`;
+    input.setAttribute("aria-label", `Nombre de ${autoGuest}`);
+    input.dataset.person = person.name;
+    saveButton.type = "button";
+    saveButton.dataset.person = person.name;
+    rename.append(input, saveButton);
+    details.append(rename);
+  }
+
+  left.append(avatar, details);
+  row.append(left, chip);
+  return row;
+}
+
+function showResults(result, { scroll = true } = {}) {
   $("#resultados").hidden = false;
   $("#totalGastado").textContent = formatMoney(result.total);
   $("#cantidadPersonas").textContent = String(result.people.length);
@@ -447,36 +683,33 @@ function showResults(result) {
       ? formatMoney(minimumShare)
       : `${formatMoney(minimumShare)}–${formatMoney(maximumShare)}`;
 
+  const unnamedGuests = result.people.filter(
+    (person) => getAutoGuestLabel(person.name) && canonicalName(person.name) === canonicalName(getAutoGuestLabel(person.name)),
+  ).length;
+  const hint = $("#balancesHint");
+  if (hint) {
+    hint.hidden = unnamedGuests === 0;
+    hint.textContent =
+      unnamedGuests === 1
+        ? "Hay 1 invitado automático. Ponle un nombre para reconocerlo en la cuota."
+        : `Hay ${unnamedGuests} invitados automáticos. Ponles un nombre para reconocerlos en la cuota.`;
+  }
+
   const balancesList = $("#balancesList");
   balancesList.replaceChildren();
 
-  result.people.forEach((person) => {
-    const row = createElement("article", "balance-item");
-    const left = createElement("div", "balance-left");
-    const avatar = createElement("div", "avatar", initials(person.name));
-    const details = createElement("div");
-    const name = createElement("div", "balance-name", person.name);
-    const paid = createElement(
-      "div",
-      "balance-paid",
-      `Pagó ${formatMoney(person.totalPaid)} · Cuota ${formatMoney(person.fairShare)}`,
-    );
-    const balance = Number(person.balance);
-    const chipClass =
-      balance > 0 ? "chip-positive" : balance < 0 ? "chip-negative" : "chip-neutral";
-    const chipText =
-      balance > 0
-        ? `Le deben ${formatMoney(balance)}`
-        : balance < 0
-          ? `Debe ${formatMoney(Math.abs(balance))}`
-          : "Está saldado";
-    const chip = createElement("span", `balance-chip ${chipClass}`, chipText);
+  const originalPeople = result.people.filter((person) => !getAutoGuestLabel(person.name));
+  const guestPeople = result.people.filter((person) => getAutoGuestLabel(person.name));
+  const splitBalances = originalPeople.length > 0 && guestPeople.length > 0;
 
-    details.append(name, paid);
-    left.append(avatar, details);
-    row.append(left, chip);
-    balancesList.append(row);
-  });
+  if (splitBalances) {
+    appendGroupTitle(balancesList, "Gastos que ya estaban");
+    originalPeople.forEach((person) => balancesList.append(createBalanceRow(person)));
+    appendGroupTitle(balancesList, "Invitados automáticos");
+    guestPeople.forEach((person) => balancesList.append(createBalanceRow(person)));
+  } else {
+    result.people.forEach((person) => balancesList.append(createBalanceRow(person)));
+  }
 
   const transfersList = $("#transfersList");
   transfersList.replaceChildren();
@@ -489,7 +722,11 @@ function showResults(result) {
     const alias = getAlias(transfer.to);
     const row = createElement("article", "transfer-item");
     const top = createElement("div", "transfer-top");
-    const route = createElement("span", "", `${transfer.from} → ${transfer.to}`);
+    const route = createElement(
+      "span",
+      "",
+      `${displayPersonName(transfer.from)} → ${displayPersonName(transfer.to)}`,
+    );
     const amount = createElement("span", "transfer-amount", formatMoney(transfer.amount));
     const bottom = createElement("div", "transfer-bottom");
     const aliasEditor = createElement("div", "alias-editor");
@@ -499,13 +736,15 @@ function showResults(result) {
 
     aliasInput.type = "text";
     aliasInput.value = alias;
-    aliasInput.placeholder = `Llave o cuenta de ${transfer.to}`;
+    aliasInput.placeholder = `Llave o cuenta de ${displayPersonName(transfer.to)}`;
     aliasInput.setAttribute("aria-label", `Llave o cuenta de ${transfer.to}`);
     saveAliasButton.type = "button";
     saveAliasButton.dataset.person = transfer.to;
     copyButton.type = "button";
     copyButton.dataset.from = transfer.from;
+    copyButton.dataset.fromLabel = displayPersonName(transfer.from);
     copyButton.dataset.recipient = transfer.to;
+    copyButton.dataset.recipientLabel = displayPersonName(transfer.to);
     copyButton.dataset.amount = formatMoney(transfer.amount);
     aliasEditor.append(aliasInput, saveAliasButton);
     top.append(route, amount);
@@ -519,8 +758,82 @@ function showResults(result) {
       ? `Después de estas transferencias, cada persona habrá aportado ${formatMoney(minimumShare)}.`
       : `Para cerrar los centavos, las cuotas quedan entre ${formatMoney(minimumShare)} y ${formatMoney(maximumShare)}.`;
 
-  $("#resultados").scrollIntoView({ behavior: "smooth", block: "start" });
+  if (scroll) {
+    $("#resultados").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
+
+function renameAutoGuest(oldName, rawName) {
+  const nextName = rawName.trim().replace(/\s+/g, " ");
+  const autoGuest = getAutoGuestLabel(oldName);
+
+  if (!nextName) {
+    showToast("Escribe el nombre de este invitado.");
+    return;
+  }
+
+  if (canonicalName(nextName) === canonicalName(oldName)) {
+    showToast("Ese invitado ya tiene ese nombre.");
+    return;
+  }
+
+  const taken = expenses.some(
+    (expense) =>
+      canonicalName(expense.paidBy) !== canonicalName(oldName) &&
+      canonicalName(expense.paidBy) === canonicalName(nextName),
+  );
+  if (taken) {
+    showToast(`Ya existe alguien llamado “${nextName}”. Usa otro nombre.`);
+    return;
+  }
+
+  const oldKey = canonicalName(oldName);
+  expenses.forEach((expense) => {
+    if (canonicalName(expense.paidBy) === oldKey) {
+      expense.paidBy = nextName;
+      expense.autoGuest ??= autoGuest;
+    }
+  });
+
+  const aliases = activeEvent().aliases;
+  if (aliases && aliases[oldKey] !== undefined) {
+    aliases[canonicalName(nextName)] = aliases[oldKey];
+    delete aliases[oldKey];
+  }
+
+  if (resultadoActual) {
+    resultadoActual.people.forEach((person) => {
+      if (canonicalName(person.name) === oldKey) person.name = nextName;
+    });
+    resultadoActual.transfers.forEach((transfer) => {
+      if (canonicalName(transfer.from) === oldKey) transfer.from = nextName;
+      if (canonicalName(transfer.to) === oldKey) transfer.to = nextName;
+    });
+  }
+
+  saveState();
+  renderExpenses();
+  if (resultadoActual) showResults(resultadoActual, { scroll: false });
+  showToast(`${autoGuest || "Invitado"} identificado como “${nextName}”.`);
+}
+
+$("#balancesList").addEventListener("click", (event) => {
+  const button = event.target.closest(".save-guest-name-btn");
+  if (!button) return;
+
+  const row = button.closest(".balance-item");
+  const input = row?.querySelector(".guest-name-input");
+  renameAutoGuest(button.dataset.person, input?.value ?? "");
+});
+
+$("#balancesList").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  const input = event.target.closest(".guest-name-input");
+  if (!input) return;
+
+  event.preventDefault();
+  renameAutoGuest(input.dataset.person, input.value);
+});
 
 function getAlias(name) {
   return activeEvent().aliases?.[canonicalName(name)] || "";
@@ -559,7 +872,7 @@ $("#transfersList").addEventListener("click", async (event) => {
   try {
     const recipient = button.dataset.recipient;
     const alias = getAlias(recipient);
-    const text = `${button.dataset.from} le transfiere ${button.dataset.amount} a ${recipient}${
+    const text = `${button.dataset.fromLabel || button.dataset.from} le transfiere ${button.dataset.amount} a ${button.dataset.recipientLabel || recipient}${
       alias ? `. Llave o cuenta: ${alias}` : ""
     }`;
     await navigator.clipboard.writeText(text);
@@ -589,7 +902,7 @@ $("#btnWhatsapp").addEventListener("click", () => {
   resultadoActual.transfers.forEach((transfer) => {
     const alias = getAlias(transfer.to);
     lines.push(
-      `${transfer.from} le transfiere ${formatMoney(transfer.amount)} a ${transfer.to}${
+      `${displayPersonName(transfer.from)} le transfiere ${formatMoney(transfer.amount)} a ${displayPersonName(transfer.to)}${
         alias ? ` (llave/cuenta: ${alias})` : ""
       }`,
     );
@@ -598,16 +911,93 @@ $("#btnWhatsapp").addEventListener("click", () => {
   window.open(`https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`, "_blank", "noopener");
 });
 
-$("#btnReiniciar").addEventListener("click", () => {
-  if (!window.confirm("¿Seguro que deseas borrar los gastos del evento actual?")) return;
+function clearQuotas({ confirm = true, silent = false } = {}) {
+  if (!resultadoActual && $("#resultados").hidden) {
+    if (!silent) showToast("No hay cuotas calculadas para limpiar.");
+    return;
+  }
+
+  if (confirm && !window.confirm("¿Deseas limpiar las cuotas y transferencias?")) return;
+
+  resultadoActual = null;
+  $("#resultados").hidden = true;
+  $("#balancesList").replaceChildren();
+  $("#transfersList").replaceChildren();
+  $("#totalGastado").textContent = "$ 0";
+  $("#cantidadPersonas").textContent = "0";
+  $("#cuotaJusta").textContent = "$ 0";
+  $("#cantidadPagos").textContent = "0 pagos";
+  $("#checkFinal").textContent = "";
+  document.querySelectorAll(".navtab").forEach((item) => item.classList.remove("active"));
+  document.querySelector('.navtab[data-target="gastos"]')?.classList.add("active");
+
+  if (!silent) showToast("Cuotas limpiadas. Los gastos siguen cargados.");
+}
+
+$("#btnLimpiarCuotas")?.addEventListener("click", () => clearQuotas());
+
+function clearExpenses() {
+  if (expenses.length === 0) {
+    showToast("No hay gastos cargados para limpiar.");
+    return;
+  }
+
+  if (!window.confirm("¿Seguro que deseas borrar todos los gastos del evento actual?")) return;
 
   expenses = [];
   activeEvent().expenses = expenses;
   resultadoActual = null;
   $("#resultados").hidden = true;
+  $("#expenseForm").reset();
+  finishExpenseEditing();
+  resetNameFilter();
   saveState();
   renderExpenses();
+  showToast("Gastos limpiados con éxito.");
+}
+
+$("#btnFiltrarNombres")?.addEventListener("click", () => {
+  filterPanelOpen = !filterPanelOpen;
+  if (filterPanelOpen) {
+    $("#filtroNombresPanel").hidden = false;
+    renderNameFilter();
+    $("#inputFiltroNombre").focus();
+    return;
+  }
+
+  renderExpenses();
 });
+
+$("#inputFiltroNombre")?.addEventListener("input", (event) => {
+  nameFilter = event.target.value;
+  renderExpenses();
+});
+
+$("#btnQuitarFiltro")?.addEventListener("click", () => {
+  nameFilter = "";
+  $("#inputFiltroNombre").value = "";
+  renderExpenses();
+});
+
+$("#nameFilterChips")?.addEventListener("click", (event) => {
+  const chip = event.target.closest(".name-chip");
+  if (!chip) return;
+
+  const selected = chip.dataset.name;
+  if (canonicalName(nameFilter) === canonicalName(selected)) {
+    nameFilter = "";
+    $("#inputFiltroNombre").value = "";
+  } else {
+    nameFilter = selected;
+    $("#inputFiltroNombre").value = selected;
+  }
+
+  filterPanelOpen = true;
+  renderExpenses();
+});
+
+$("#btnLimpiarGastos")?.addEventListener("click", clearExpenses);
+$("#btnReiniciar")?.addEventListener("click", clearExpenses);
 
 document.querySelectorAll(".navtab").forEach((tab) => {
   tab.addEventListener("click", () => {
@@ -709,6 +1099,7 @@ $("#eventosList").addEventListener("click", (event) => {
       $("#resultados").hidden = true;
       $("#expenseForm").reset();
       finishExpenseEditing();
+      resetNameFilter();
     }
 
     saveState();
@@ -726,6 +1117,7 @@ $("#eventosList").addEventListener("click", (event) => {
   $("#resultados").hidden = true;
   $("#expenseForm").reset();
   finishExpenseEditing();
+  resetNameFilter();
   saveState();
   renderEvents();
   renderExpenses();
@@ -769,6 +1161,7 @@ $("#btnConfirmarEvento").addEventListener("click", () => {
   expenses = newEvent.expenses;
   resultadoActual = null;
   $("#resultados").hidden = true;
+  resetNameFilter();
   saveState();
   renderExpenses();
   $("#eventDialog").close();
