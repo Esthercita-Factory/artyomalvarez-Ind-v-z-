@@ -1,6 +1,6 @@
 <Solution>
-  <Project Path="InDivizia.Api/InDivizia.Api.csproj" />
-  <Project Path="InDivizia.Application.Tests/InDivizia.Application.Tests.csproj" />
-  <Project Path="InDivizia.Application/InDivizia.Application.csproj" />
-  <Project Path="InDivizia.Domain/InDivizia.Domain.csproj" />
+  <Project Path="src/InDivizia.Api/InDivizia.Api.csproj" />
+  <Project Path="src/InDivizia.Application.Tests/InDivizia.Application.Tests.csproj" />
+  <Project Path="src/InDivizia.Application/InDivizia.Application.csproj" />
+  <Project Path="src/InDivizia.Domain/InDivizia.Domain.csproj" />
 </Solution>
