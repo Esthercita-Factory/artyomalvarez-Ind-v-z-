@@ -107,8 +107,33 @@
         </form>
 
         <div class="list-header">
-          <span>Gastos cargados (<strong id="countGastos">0</strong>)</span>
+          <div class="list-header-left">
+            <span>Gastos cargados (<strong id="countGastos">0</strong>)</span>
+            <button id="btnFiltrarNombres" class="filter-expenses-btn" type="button" title="Filtrar la lista por nombre" hidden>
+              <span class="material-symbols-outlined">filter_list</span>
+              Filtrar
+            </button>
+            <button id="btnLimpiarGastos" class="clear-expenses-btn" type="button" title="Borrar todos los gastos cargados" hidden>
+              <span class="material-symbols-outlined">delete_sweep</span>
+              Limpiar gastos
+            </button>
+          </div>
           <strong id="subtotalValue">$ 0</strong>
+        </div>
+        <div id="filtroNombresPanel" class="name-filter" hidden>
+          <div class="name-filter-row">
+            <label class="sr-only" for="inputFiltroNombre">Filtrar por nombre</label>
+            <input
+              id="inputFiltroNombre"
+              type="search"
+              autocomplete="off"
+              placeholder="Escribí un nombre..."
+            />
+            <button id="btnQuitarFiltro" class="secondary-button compact" type="button" hidden>
+              Quitar
+            </button>
+          </div>
+          <div id="nameFilterChips" class="name-filter-chips" hidden></div>
         </div>
         <div id="expensesList" class="scroll-list empty-list">
           <p>Todavía no has agregado gastos.</p>
@@ -174,7 +199,13 @@
             <h2>Liquidación simplificada</h2>
             <p>Balances y transferencias sugeridas.</p>
           </div>
-          <span id="cantidadPagos" class="badge">0 pagos</span>
+          <div class="results-actions">
+            <span id="cantidadPagos" class="badge">0 pagos</span>
+            <button id="btnLimpiarCuotas" class="clear-results-btn" type="button">
+              <span class="material-symbols-outlined">restart_alt</span>
+              Limpiar cuotas
+            </button>
+          </div>
         </div>
 
         <div class="metrics">
@@ -185,6 +216,7 @@
 
         <section id="balances">
           <h3>Balances</h3>
+          <p id="balancesHint" class="balances-hint" hidden></p>
           <div id="balancesList" class="scroll-list results-list"></div>
         </section>
 

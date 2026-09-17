@@ -419,6 +419,105 @@ fieldset {
   font-size: 11px;
 }
 
+.list-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-expenses-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid rgb(8 12 33 / 18%);
+  border-radius: 6px;
+  color: var(--primary);
+  background: #eaedff;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 150ms ease;
+}
+
+.filter-expenses-btn:hover,
+.filter-expenses-btn.active {
+  border-color: var(--primary);
+  background: #dce2ff;
+}
+
+.filter-expenses-btn .material-symbols-outlined {
+  font-size: 15px;
+}
+
+.name-filter {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.name-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.name-filter-row input {
+  margin-top: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.name-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.name-chip {
+  padding: 4px 8px;
+  border: 1px solid var(--outline);
+  border-radius: 999px;
+  color: var(--muted);
+  background: white;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.name-chip.active {
+  border-color: var(--primary);
+  color: white;
+  background: var(--primary);
+}
+
+.clear-expenses-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid rgb(186 26 26 / 35%);
+  border-radius: 6px;
+  color: var(--error);
+  background: #fff2f2;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 150ms ease;
+  cursor: pointer;
+}
+
+.clear-expenses-btn:hover {
+  background: #ffdad6;
+  border-color: var(--error);
+}
+
+.clear-expenses-btn:active {
+  transform: scale(0.96);
+}
+
+.clear-expenses-btn .material-symbols-outlined {
+  font-size: 15px;
+}
+
 .scroll-list {
   max-height: 190px;
   margin-top: 9px;
@@ -452,6 +551,38 @@ fieldset {
 .balance-item + .balance-item,
 .transfer-item + .transfer-item {
   margin-top: 6px;
+}
+
+.expense-group-title {
+  margin: 10px 0 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.expense-group-title:first-child {
+  margin-top: 2px;
+}
+
+.expense-item.auto-guest-expense {
+  align-items: flex-start;
+  border-color: rgb(0 108 74 / 22%);
+}
+
+.expense-item.auto-guest-expense .expense-info {
+  flex: 1;
+  align-items: flex-start;
+}
+
+.expense-item.auto-guest-expense .expense-info > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.expense-item.auto-guest-expense .expense-name {
+  white-space: normal;
 }
 
 .expense-info,
@@ -496,6 +627,73 @@ fieldset {
 
 .expense-tag {
   margin-left: 5px;
+}
+
+.guest-badge {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #7a4f01;
+  background: #fff4d6;
+  font-size: 9px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.balances-hint {
+  margin: 6px 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.balance-item.auto-guest-row {
+  align-items: flex-start;
+  border-color: rgb(0 108 74 / 22%);
+}
+
+.balance-item.auto-guest-row .balance-left {
+  flex: 1;
+  align-items: flex-start;
+}
+
+.balance-item.auto-guest-row .balance-left > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.balance-item.auto-guest-row .balance-name {
+  white-space: normal;
+}
+
+.avatar.auto-guest {
+  color: white;
+}
+
+.guest-rename {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.guest-rename input {
+  min-width: 0;
+  margin: 0;
+  padding: 6px 8px;
+  background: white;
+  font-size: 11px;
+}
+
+.save-guest-name-btn {
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  border: 1px solid var(--outline);
+  border-radius: 6px;
+  color: var(--primary);
+  background: white;
+  font-size: 9px;
+  font-weight: 700;
 }
 
 .expense-right {
@@ -635,6 +833,37 @@ fieldset {
   min-height: 52px;
   border-radius: 13px;
   font-size: 15px;
+}
+
+.results-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.clear-results-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid rgb(186 26 26 / 35%);
+  border-radius: 7px;
+  color: var(--error);
+  background: #fff2f2;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.clear-results-btn:hover {
+  background: #ffdad6;
+  border-color: var(--error);
+}
+
+.clear-results-btn .material-symbols-outlined {
+  font-size: 16px;
 }
 
 .results {
